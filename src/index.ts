@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { User } from 'misskey-js/entities.js'
+import { error, misskeyApi, getUserText } from './utils'
 import type { MisskeyWebhookPayload } from './types'
 
 const app = new Hono()
@@ -12,60 +13,125 @@ app.post('/api/webhooks/:id', async r => {
 	const channelId = r.req.param('id')
 	if (!channelId) return r.json(error('ChannelID is required'), 400)
 
-	const body = await r.req.json<MisskeyWebhookPayload>()
+	const payload = await r.req.json<MisskeyWebhookPayload>()
 	let color = 0x000000
 	let title = 'Unknown'
 	let content: string | null = null
 	let user: User | null = null
 
-	switch (body.type) {
-		case 'note':
+	const fields: { name: string, value: string }[] = []
+
+	switch (payload.type) {
+		case 'note': {
 			color = 0x007aff
 			title = 'Note'
-			content = body.body.note.text
-			user = body.body.note.user
+			content = payload.body.note.text
+			user = payload.body.note.user
 			break
-		case 'reply':
+		}
+
+		case 'reply': {
 			color = 0x007aff
 			title = 'Reply'
-			content = body.body.note.text
-			user = body.body.note.user
+			content = payload.body.note.text
+			user = payload.body.note.user
 			break
-		case 'renote':
+		}
+
+		case 'renote': {
 			color = 0x36d298
 			title = 'Renote'
-			content = body.body.note.text
-			user = body.body.note.user
+			content = payload.body.note.text
+			user = payload.body.note.user
 			break
-		case 'mention':
+		}
+
+		case 'mention': {
 			color = 0x88a6b7
 			title = 'Mention'
-			content = body.body.note.text
-			user = body.body.note.user
+			content = payload.body.note.text
+			user = payload.body.note.user
 			break
-		case 'unfollow':
+		}
+
+		case 'unfollow': {
 			color = 0xcb9a11
 			title = 'Unfollow'
-			content = `Unfollowed ${body.body.user.name}`
-			user = body.body.user
+			content = `Unfollowed ${payload.body.user.name}`
+			user = payload.body.user
 			break
-		case 'follow':
+		}
+
+		case 'follow': {
 			color = 0x36aed2
 			title = 'Follow'
-			content = `Follow ${body.body.user.name}`
-			user = body.body.user
+			content = `Follow ${payload.body.user.name}`
+			user = payload.body.user
 			break
-		case 'followed':
+		}
+
+		case 'followed': {
 			color = 0x36aed2
 			title = 'Followed'
-			content = `Followed ${body.body.user.name}`
-			user = body.body.user
+			content = `Followed ${payload.body.user.name}`
+			user = payload.body.user
 			break
-		case 'reaction':
+		}
+
+		case 'reaction': {
 			color = 0x36d298
 			title = 'Reaction'
 			content = 'Reaction'
 			break
+		}
+
+		case 'abuseReport':
+		case 'abuseReportResolved': {
+			const reporter = await misskeyApi<User>(payload.server, 'users/show', { userId: payload.body.reporterId })
+			const reportedUser = await misskeyApi<User>(payload.server, 'users/show', { userId: payload.body.targetUserId })
+			const assignee = payload.body.assigneeId ? await misskeyApi<User>(payload.server, 'users/show', { userId: payload.body.assigneeId }) : null
+
+			if (payload.type === 'abuseReport') {
+				color = 0xdd2e44
+				title = 'Created abuse report'
+				content = `Created abuse report by ${reporter.name}\n[View](${payload.server}/admin/abuses)`
+			} else {
+				color = 0x36d298
+				title = 'Resolved abuse report'
+				content = `Resolved abuse report by ${assignee?.name || '???'}`
+			}
+
+			fields.push({
+				name: 'Comment',
+				value: payload.body.comment
+			})
+
+			fields.push({
+				name: 'Reporter',
+				value: getUserText(payload.server, reporter)
+			})
+
+			fields.push({
+				name: 'Reported user',
+				value: getUserText(payload.server, reportedUser)
+			})
+
+			if (assignee) {
+				fields.push({
+					name: 'Assignee',
+					value: getUserText(payload.server, assignee)
+				})
+			}
+
+			break
+		}
+
+		case 'userCreated': {
+			color = 0xcb9a11
+			title = 'User created'
+			content = `User created: [${payload.body.name}](${payload.server}/@${payload.body.username})`
+			break
+		}
 	}
 
 	const embed = {
@@ -76,10 +142,11 @@ app.post('/api/webhooks/:id', async r => {
 		title,
 		color,
 		description: content,
+		fields: fields.length ? fields : undefined,
 		footer: {
-			text: `Misskey (${body.server.replace(/^https?:\/\//, '')})`
+			text: `Misskey (${payload.server.replace(/^https?:\/\//, '')})`
 		},
-		timestamp: new Date(body.createdAt).toISOString()
+		timestamp: new Date(payload.createdAt).toISOString()
 	}
 
 	try {
@@ -101,12 +168,5 @@ app.post('/api/webhooks/:id', async r => {
 		status: 'ok',
 	})
 })
-
-function error(message: string) {
-	return {
-		status: 'error',
-		message
-	}
-}
 
 export default app
