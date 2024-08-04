@@ -40,6 +40,13 @@ pnpm run deploy
 (例: <https://misskey-webhook-to-discord.example.workers.dev/api/webhooks/1234567890123456789>)  
 **シークレット**: 先程控えたDiscordのWebhookシークレット
 
+> [!NOTE]
+> もしあなたがサーバー管理者で、通報に関するWebhookを転送したいと考えている場合は、**追加で以下の設定を行う必要があります。**  
+>   
+> コントロールパネル -> 通報 -> 通知設定 -> 通報の通知先を追加 -> 先程作成したWebhookを選択
+>
+> この設定を行わないとWebhookが送信されません (1敗)
+
 ### おわり
 以上で設定は完了です。  
 これでMisskeyのWebhookがDiscordに転送されるようになるはずです。
