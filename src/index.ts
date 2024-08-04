@@ -2,30 +2,15 @@ import { Hono } from 'hono'
 import type { User } from 'misskey-js/entities.js'
 import type { MisskeyWebhookPayload } from './types'
 
-type Bindings = {
-	KV: KVNamespace;
-}
-
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono()
 
 app.get('/', r => r.redirect('https://github.com/hideki0403/misskey-webhook-to-discord/'))
-app.post('/proxy', async r => {
-	const misskeyWebhookSecret = await r.env.KV.get('misskeyWebhookSecret')
+app.post('/api/webhooks/:id', async r => {
 	const secret = r.req.header('X-Misskey-Hook-Secret')
-	if (secret !== misskeyWebhookSecret) {
-		return r.json({
-			status: 'error',
-			message: 'Invalid secret'
-		}, 401)
-	}
+	if (!secret) return r.json(error('Secret is required'), 400)
 
-	const discordWebhookUrl = await r.env.KV.get('discordWebhookUrl')
-	if (!discordWebhookUrl) {
-		return r.json({
-			status: 'error',
-			message: 'Discord webhook URL is not set'
-		}, 500)
-	}
+	const channelId = r.req.param('id')
+	if (!channelId) return r.json(error('ChannelID is required'), 400)
 
 	const body = await r.req.json<MisskeyWebhookPayload>()
 	let color = 0x000000
@@ -97,19 +82,31 @@ app.post('/proxy', async r => {
 		timestamp: new Date(body.createdAt).toISOString()
 	}
 
-	await fetch(discordWebhookUrl, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({
-			embeds: [embed]
+	try {
+		await fetch(`https://discord.com/api/webhooks/${channelId}/${secret}`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				embeds: [embed]
+			})
 		})
-	})
+	} catch (e) {
+		console.error(e)
+		return r.json(error('Failed to send webhook. Please check the channel ID and secret.'), 500)
+	}
 
 	return r.json({
-		status: 'ok'
+		status: 'ok',
 	})
 })
+
+function error(message: string) {
+	return {
+		status: 'error',
+		message
+	}
+}
 
 export default app
