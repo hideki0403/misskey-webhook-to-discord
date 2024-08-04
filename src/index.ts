@@ -3,15 +3,28 @@ import type { User } from 'misskey-js/entities.js'
 import { error, misskeyApi, getUserText } from './utils'
 import type { MisskeyWebhookPayload } from './types'
 
-const app = new Hono()
+type Bindings = {
+	KV: KVNamespace;
+}
+
+const app = new Hono<{ Bindings: Bindings }>()
 
 app.get('/', r => r.redirect('https://github.com/hideki0403/misskey-webhook-to-discord/'))
-app.post('/api/webhooks/:id', async r => {
+app.post('/api/webhooks/:id/:token', async r => {
 	const secret = r.req.header('X-Misskey-Hook-Secret')
-	if (!secret) return r.json(error('Secret is required'), 400)
+	const misskeyWebhookSecret = await r.env.KV.get('misskeyWebhookSecret')
+	if (misskeyWebhookSecret != null && secret !== misskeyWebhookSecret) {
+		return r.json({
+			status: 'error',
+			message: 'Invalid secret'
+		}, 401)
+	}
 
 	const channelId = r.req.param('id')
 	if (!channelId) return r.json(error('ChannelID is required'), 400)
+
+	const token = r.req.param('token')
+	if (!token) return r.json(error('Token is required'), 400)
 
 	const payload = await r.req.json<MisskeyWebhookPayload>()
 	let color = 0x000000
@@ -150,7 +163,7 @@ app.post('/api/webhooks/:id', async r => {
 	}
 
 	try {
-		await fetch(`https://discord.com/api/webhooks/${channelId}/${secret}`, {
+		await fetch(`https://discord.com/api/webhooks/${channelId}/${token}`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
