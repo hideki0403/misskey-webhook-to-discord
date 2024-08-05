@@ -82,3 +82,11 @@ Discordの任意のチャンネルで作成したWebhookURLの`https://discord.c
 ### おわり
 以上で設定は完了です。  
 これでMisskeyのWebhookがDiscordに転送されるようになるはずです。
+
+## マイグレーション
+### v1.0.0 -> v2.0.0
+- KVの`discordWebhookUrl`は使用されなくなりました  
+  - 必要に応じて削除をお願いします  
+- Misskey側のWebhookURLの再設定をお願いします
+  - これまでの `https://misskey-webhook-to-discord.example.workers.dev/proxy` の形式では転送できなくなりました
+  - ドキュメントの「Misskey側で設定する」を参考に再設定をお願いします
