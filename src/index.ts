@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { EmbedGenerator } from './discord'
 import { error, misskeyApi, getUserText } from './utils'
-import type { User } from 'misskey-js/entities.js'
+import type { MetaLite, User } from 'misskey-js/entities.js'
 import type { MisskeyWebhookPayload } from './types'
 
 type Bindings = {
@@ -110,11 +110,12 @@ app.post('/api/webhooks/:id/:token', async r => {
 				embed.setDescription(`Resolved abuse report by ${assignee?.name || '???'}`)
 			}
 
-			embed.addField('Comment', payload.body.comment)
-			embed.addField('Reporter', getUserText(payload.server, reporter))
-			embed.addField('Reported user', getUserText(payload.server, reportedUser))
+			embed.addField('Comment', payload.body.comment, false)
+			embed.addField('Reporter', getUserText(payload.server, reporter), true)
+			embed.addField('Reported user', getUserText(payload.server, reportedUser), true)
 
-			if (assignee) embed.addField('Assignee', getUserText(payload.server, assignee))
+			if (assignee) embed.addField('Assignee', getUserText(payload.server, assignee), true)
+			if (reportedUser.avatarUrl) embed.setThumbnail(reportedUser.avatarUrl)
 
 			break
 		}
@@ -123,14 +124,16 @@ app.post('/api/webhooks/:id/:token', async r => {
 			embed.setColor(0xcb9a11)
 			embed.setTitle('User created')
 			embed.setDescription(`User created: [${payload.body.name}](${payload.server}/@${payload.body.username})`)
-			embed.setMisskeyUser(payload.body)
 			break
 		}
 	}
 
+	const instance = await misskeyApi<MetaLite>(payload.server, 'meta')
+
 	embed.setTimestamp(new Date(payload.createdAt))
 	embed.setFooter({
-		text: `Misskey (${payload.server.replace(/^https?:\/\//, '')})`
+		text: `Misskey (${payload.server.replace(/^https?:\/\//, '')})`,
+		icon_url: instance.iconUrl ?? undefined
 	})
 
 	try {
