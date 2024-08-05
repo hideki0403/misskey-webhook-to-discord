@@ -132,7 +132,7 @@ app.post('/api/webhooks/:id/:token', async r => {
 
 	embed.setTimestamp(new Date(payload.createdAt))
 	embed.setFooter({
-		text: `Misskey (${payload.server.replace(/^https?:\/\//, '')})`,
+		text: `${instance.shortName ?? instance.name ?? 'Misskey'} (${instance.uri.replace(/^https?:\/\//, '')})`,
 		icon_url: instance.iconUrl ?? undefined
 	})
 
