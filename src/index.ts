@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
-import type { User } from 'misskey-js/entities.js'
+import { EmbedGenerator } from './discord'
 import { error, misskeyApi, getUserText } from './utils'
+import type { User } from 'misskey-js/entities.js'
 import type { MisskeyWebhookPayload } from './types'
 
 type Bindings = {
@@ -27,74 +28,69 @@ app.post('/api/webhooks/:id/:token', async r => {
 	if (!token) return r.json(error('Token is required'), 400)
 
 	const payload = await r.req.json<MisskeyWebhookPayload>()
-	let color = 0x000000
-	let title = 'Unknown'
-	let content: string | null = null
-	let user: User | null = null
-
-	const fields: { name: string, value: string }[] = []
+	const embed = new EmbedGenerator().setTitle('Unknown')
 
 	switch (payload.type) {
 		case 'note': {
-			color = 0x007aff
-			title = 'Note'
-			content = payload.body.note.text
-			user = payload.body.note.user
+			embed.setColor(0x007aff)
+			embed.setTitle('Note')
+			embed.setDescription(payload.body.note.text)
+			embed.setMisskeyUser(payload.body.note.user)
 			break
 		}
 
 		case 'reply': {
-			color = 0x007aff
-			title = 'Reply'
-			content = payload.body.note.text
-			user = payload.body.note.user
+			embed.setColor(0x007aff)
+			embed.setTitle('Reply')
+			embed.setDescription(payload.body.note.text)
+			embed.setMisskeyUser(payload.body.note.user)
 			break
 		}
 
 		case 'renote': {
-			color = 0x36d298
-			title = 'Renote'
-			content = payload.body.note.text
-			user = payload.body.note.user
+			embed.setColor(0x36d298)
+			embed.setTitle('Renote')
+			embed.setDescription(payload.body.note.text)
+			embed.setMisskeyUser(payload.body.note.user)
 			break
 		}
 
 		case 'mention': {
-			color = 0x88a6b7
-			title = 'Mention'
-			content = payload.body.note.text
-			user = payload.body.note.user
+			embed.setColor(0x88a6b7)
+			embed.setTitle('Mention')
+			embed.setDescription(payload.body.note.text)
+			embed.setMisskeyUser(payload.body.note.user)
 			break
 		}
 
 		case 'unfollow': {
-			color = 0xcb9a11
-			title = 'Unfollow'
-			content = `Unfollowed ${payload.body.user.name}`
-			user = payload.body.user
+			embed.setColor(0xcb9a11)
+			embed.setTitle('Unfollow')
+			embed.setDescription(`Unfollowed ${payload.body.user.name}`)
+			embed.setMisskeyUser(payload.body.user)
 			break
 		}
 
 		case 'follow': {
-			color = 0x36aed2
-			title = 'Follow'
-			content = `Follow ${payload.body.user.name}`
-			user = payload.body.user
+			embed.setColor(0x36aed2)
+			embed.setTitle('Follow')
+			embed.setDescription(`Follow ${payload.body.user.name}`)
+			embed.setMisskeyUser(payload.body.user)
 			break
 		}
 
 		case 'followed': {
-			color = 0x36aed2
-			title = 'Followed'
-			content = `Followed ${payload.body.user.name}`
-			user = payload.body.user
+			embed.setColor(0x36aed2)
+			embed.setTitle('Followed')
+			embed.setDescription(`Followed ${payload.body.user.name}`)
+			embed.setMisskeyUser(payload.body.user)
 			break
 		}
 
 		case 'reaction': {
-			color = 0x36d298
-			title = 'Reaction'
-			content = 'Reaction'
+			embed.setColor(0x36d298)
+			embed.setTitle('Reaction')
+			embed.setDescription('Reaction')
 			break
 		}
 
@@ -105,73 +101,40 @@ app.post('/api/webhooks/:id/:token', async r => {
 			const assignee = payload.body.assigneeId ? await misskeyApi<User>(payload.server, 'users/show', { userId: payload.body.assigneeId }) : null
 
 			if (payload.type === 'abuseReport') {
-				color = 0xdd2e44
-				title = 'Created abuse report'
-				content = `Created abuse report by ${reporter.name}\n[View](${payload.server}/admin/abuses)`
+				embed.setColor(0xdd2e44)
+				embed.setTitle('Created abuse report')
+				embed.setDescription(`Created abuse report by ${reporter.name}\n[View](${payload.server}/admin/abuses)`)
 			} else {
-				color = 0x36d298
-				title = 'Resolved abuse report'
-				content = `Resolved abuse report by ${assignee?.name || '???'}`
+				embed.setColor(0x36d298)
+				embed.setTitle('Resolved abuse report')
+				embed.setDescription(`Resolved abuse report by ${assignee?.name || '???'}`)
 			}
 
-			fields.push({
-				name: 'Comment',
-				value: payload.body.comment
-			})
+			embed.addField('Comment', payload.body.comment)
+			embed.addField('Reporter', getUserText(payload.server, reporter))
+			embed.addField('Reported user', getUserText(payload.server, reportedUser))
 
-			fields.push({
-				name: 'Reporter',
-				value: getUserText(payload.server, reporter)
-			})
-
-			fields.push({
-				name: 'Reported user',
-				value: getUserText(payload.server, reportedUser)
-			})
-
-			if (assignee) {
-				fields.push({
-					name: 'Assignee',
-					value: getUserText(payload.server, assignee)
-				})
-			}
+			if (assignee) embed.addField('Assignee', getUserText(payload.server, assignee))
 
 			break
 		}
 
 		case 'userCreated': {
-			color = 0xcb9a11
-			title = 'User created'
-			content = `User created: [${payload.body.name}](${payload.server}/@${payload.body.username})`
+			embed.setColor(0xcb9a11)
+			embed.setTitle('User created')
+			embed.setDescription(`User created: [${payload.body.name}](${payload.server}/@${payload.body.username})`)
+			embed.setMisskeyUser(payload.body)
 			break
 		}
 	}
 
-	const embed = {
-		author: user ? {
-			name: user.name,
-			icon_url: user.avatarUrl
-		} : undefined,
-		title,
-		color,
-		description: content,
-		fields: fields.length ? fields : undefined,
-		footer: {
-			text: `Misskey (${payload.server.replace(/^https?:\/\//, '')})`
-		},
-		timestamp: new Date(payload.createdAt).toISOString()
-	}
+	embed.setTimestamp(new Date(payload.createdAt))
+	embed.setFooter({
+		text: `Misskey (${payload.server.replace(/^https?:\/\//, '')})`
+	})
 
 	try {
-		await fetch(`https://discord.com/api/webhooks/${channelId}/${token}`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				embeds: [embed]
-			})
-		})
+		await embed.sendWebhook(channelId, token)
 	} catch (e) {
 		console.error(e)
 		return r.json(error('Failed to send webhook. Please check the channel ID and secret.'), 500)
