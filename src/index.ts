@@ -148,4 +148,23 @@ app.post('/api/webhooks/:id/:token', async r => {
 	})
 })
 
+app.post('/api/purge-cache/:key', async r => {
+	const secret = r.req.header('X-Secret')
+	const webhookSecret = await r.env.KV.get('misskeyWebhookSecret')
+	if (webhookSecret != null && secret !== webhookSecret) {
+		return r.json({
+			status: 'error',
+			message: 'Invalid secret'
+		}, 401)
+	}
+
+	const cache = caches.default
+	const result = await cache.delete(decodeURIComponent(atob(r.req.param('key'))))
+
+	return r.json({
+		status: 'ok',
+		purged: result
+	})
+})
+
 export default app
