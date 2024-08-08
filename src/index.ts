@@ -120,7 +120,7 @@ app.post('/api/webhooks/:id/:token', async r => {
 		case 'userCreated': {
 			embed.setColor(0xcb9a11)
 			embed.setTitle('User created')
-			embed.setDescription(`User created: [${payload.body.name}](${payload.server}/@${payload.body.username})`)
+			embed.setDescription(`User created: [@${payload.body.username}](${payload.server}/@${payload.body.username})`)
 			break
 		}
 	}
