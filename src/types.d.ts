@@ -36,7 +36,6 @@ type AbuseReport = {
 	reporterHost: string | null
 }
 
-
 /* User Webhook */
 type NotePayload = BaseUserPayload & {
 	type: 'note'
