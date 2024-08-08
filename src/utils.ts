@@ -8,7 +8,7 @@ export function error(message: string) {
 }
 
 export function beautifyText(text: string) {
-	return text.split('\n').map(x => x.replace(/^(\t| {2,})/g, '')).filter(x => x).join('\n')
+	return text.split('\n').map(x => x.replace(/^\s*/g, '')).filter(x => x).join('\n')
 }
 
 export function getUserText(server: string, user: User) {
